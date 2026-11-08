@@ -2,12 +2,15 @@
 Builds each set photo from the processed Color Bar photos in color-bar/ (only resized and placed on white,
 nothing edited), names under each skein in DM Sans, layout approved by Cheryl Nov 8, 2026:
 five skeins = three over two, Sock Set = main skein over two minis, Color Quartet = two over two.
-Square 2160 x 2160 JPEG on pure white."""
+Square 2160 x 2160 JPEG on pure white.
+Swatch photos (Cheryl, Nov 8, 2026): shot "swatch" = each color's close-up in a circle, same layouts, shown first on each listing."""
 import json, os, re, sys
 from PIL import Image, ImageChops, ImageDraw, ImageFont
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CB = os.path.join(ROOT, 'color-bar')
-OUT = os.path.join(ROOT, 'winter-sets')
+OUT = os.environ.get('WINTER_OUT', os.path.join(ROOT, 'winter-sets'))
+# Set-photo-only replacements for a Color Bar photo (e.g. an unlabeled mini photo): sources/<slug>-<base>-<shot>.png
+SRC = os.environ.get('WINTER_SRC', os.path.join(ROOT, 'winter-sets', 'sources'))
 FONT = os.path.expanduser('~/.fonts/DMSans[opsz,wght].ttf')
 INK = (61, 47, 42)
 S = 2160
@@ -21,8 +24,21 @@ def font(sz, wght=450):
     except Exception: pass
     return f
 
+def swatch(color, base):
+    """Color swatch: the color's own close-up photo (approved colors), center crop in a circle on white."""
+    im = Image.open(f'{CB}/{slug(color)}/{slug(color)}-{base}-5-closeup.png').convert('RGB')
+    s = min(im.size); c = int(s * 0.86); l = (im.width - c) // 2; t = (im.height - c) // 2
+    im = im.crop((l, t, l + c, t + c)).resize((900, 900), Image.LANCZOS)
+    m = Image.new('L', (3600, 3600), 0); ImageDraw.Draw(m).ellipse((8, 8, 3592, 3592), fill=255)
+    out = Image.new('RGB', (900, 900), (255, 255, 255)); out.paste(im, (0, 0), m.resize((900, 900), Image.LANCZOS))
+    return out
+
 def load(color, base, shot):
-    im = Image.open(f'{CB}/{slug(color)}/{slug(color)}-{base}-{shot}.png').convert('RGB')
+    if shot == 'swatch':
+        return swatch(color, base)
+    alt = f'{SRC}/{slug(color)}-{base}-{shot}.png'
+    path = alt if os.path.exists(alt) else f'{CB}/{slug(color)}/{slug(color)}-{base}-{shot}.png'
+    im = Image.open(path).convert('RGB')
     # lift the faint near-white halo to pure white so no crop edges show (shadow core untouched)
     L = im.convert('L')
     t = L.point(lambda v: 0 if v < 238 else (255 if v >= 251 else int((v - 238) / 13 * 255)))
